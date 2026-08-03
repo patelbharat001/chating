@@ -11,6 +11,19 @@
 <!-- PeerJS — actual chat messages travel peer-to-peer (WebRTC), never through our server -->
 <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
 
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', {
+    'anonymize_ip': true,
+    'page_path': '/chat.html',
+    'page_title': 'chating.ai - Chat App'
+  });
+</script>
+
 <style>
   :root{
     --bg:#0f1117; --panel:#171a23; --panel2:#1e2230; --border:#2a2f3f;
@@ -362,6 +375,15 @@ function createRoom(){
     connections = new Map();
     enterChatScreen(roomName);
     startHeartbeat();
+
+    // Analytics: Track room creation
+    if(typeof gtag !== 'undefined'){
+      gtag('event', 'room_created', {
+        'event_category': 'chat_action',
+        'event_label': roomName,
+        'room_id': currentRoomId
+      });
+    }
   });
 
   peer.on('connection', conn => {
@@ -455,6 +477,15 @@ function joinRoom(roomId, hostId, roomName){
       isHost = false;
       currentRoomId = roomId;
       enterChatScreen(roomName);
+
+      // Analytics: Track room joined
+      if(typeof gtag !== 'undefined'){
+        gtag('event', 'room_joined', {
+          'event_category': 'chat_action',
+          'event_label': roomName,
+          'room_id': roomId
+        });
+      }
     });
     conn.on('data', data => {
       if(data.type === 'chat') appendMessage({ from: data.from, text: data.text });
@@ -622,6 +653,14 @@ async function turnOnVideo(){
   syncMyVideoStatus();
   updateCameraButton();
   btn.disabled = false;
+
+  // Analytics: Track video enabled
+  if(typeof gtag !== 'undefined'){
+    gtag('event', 'video_enabled', {
+      'event_category': 'chat_action',
+      'participant_count': currentRoster.length
+    });
+  }
 }
 
 function turnOffVideo(){
@@ -680,6 +719,15 @@ function sendChat(){
     appendMessage({ text }); // optimistic local echo
     hostConn.send({ type:'chat', text });
   }
+
+  // Analytics: Track message sent
+  if(typeof gtag !== 'undefined'){
+    gtag('event', 'message_sent', {
+      'event_category': 'chat_action',
+      'message_length': text.length,
+      'is_host': isHost
+    });
+  }
 }
 document.getElementById('send-btn').addEventListener('click', sendChat);
 document.getElementById('chat-input').addEventListener('keydown', e => {
@@ -715,6 +763,15 @@ function returnToLobby(){
   currentRoomId = null;
   myPeerId = null;
   currentRoster = [];
+
+  // Analytics: Track room left
+  if(typeof gtag !== 'undefined'){
+    gtag('event', 'room_left', {
+      'event_category': 'chat_action',
+      'was_host': isHost
+    });
+  }
+
   showScreen('lobby');
 }
 

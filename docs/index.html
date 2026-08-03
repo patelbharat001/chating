@@ -5,6 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>chating.ai — private peer-to-peer chat</title>
 
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', {
+    'anonymize_ip': true,
+    'page_path': '/index.html',
+    'page_title': 'chating.ai - Landing Page'
+  });
+
+  // Track button clicks
+  document.addEventListener('DOMContentLoaded', () => {
+    const enterChatBtn = document.querySelector('.cta-button');
+    if(enterChatBtn){
+      enterChatBtn.addEventListener('click', () => {
+        gtag('event', 'enter_chat_clicked', {
+          'event_category': 'engagement',
+          'event_label': 'Landing Page CTA'
+        });
+      });
+    }
+  });
+</script>
+
 <style>
   :root{
     --bg:#0f1117; --panel:#171a23; --panel2:#1e2230; --border:#2a2f3f;
