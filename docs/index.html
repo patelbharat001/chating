@@ -36,6 +36,27 @@
     width:80%; max-width:300px; display:inline-block;
   }
   .cta-button:hover{ opacity:.9; }
+  .features-section{ margin-top:40px; }
+  .features-grid{
+    display:grid; grid-template-columns:1fr; gap:16px;
+  }
+  @media (min-width:641px){
+    .features-grid{ grid-template-columns:repeat(2, 1fr); }
+  }
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:24px; border-left:4px solid var(--accent); box-shadow:0 4px 12px rgba(0,0,0,.2);
+  }
+  .card:nth-child(2){ border-left-color:var(--accent2); }
+  .card:nth-child(3){ border-left-color:var(--accent); }
+  .card:nth-child(4){ border-left-color:var(--accent2); }
+  .card-icon{ font-size:32px; margin-bottom:12px; display:block; }
+  .card-title{ font-size:16px; margin:12px 0 8px; font-weight:600; }
+  .card-desc{ font-size:14px; color:var(--dim); line-height:1.6; margin:0; }
+  .footer-text{
+    text-align:center; color:var(--dim); font-size:12px; margin-top:40px; padding-top:24px;
+    border-top:1px solid var(--border);
+  }
   @media (max-width:640px){
     .hero h1{ font-size:24px; }
     .subtitle{ font-size:14px; }
@@ -50,6 +71,36 @@
     <p class="subtitle">No accounts. No servers logging your messages. Just you and them.</p>
     <button class="cta-button" onclick="window.location.href='/chat.html';">Enter Chat</button>
   </div>
+
+  <div class="features-section">
+    <div class="features-grid">
+      <div class="card">
+        <div class="card-icon">🔒</div>
+        <h3 class="card-title">Private by Design</h3>
+        <p class="card-desc">Messages stay between you. Peer-to-peer means no server logs.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3 class="card-title">Instant Access</h3>
+        <p class="card-desc">No signup. No email. Pick a name and start chatting.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">📹</div>
+        <h3 class="card-title">Video Built-In</h3>
+        <p class="card-desc">Switch to video calls without leaving the room.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">💨</div>
+        <h3 class="card-title">Fast & Lightweight</h3>
+        <p class="card-desc">WebRTC mesh network. Nothing bloated, nothing stored.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-text">chating.ai · peer-to-peer, no accounts, nothing saved</div>
 </div>
 </body>
 </html>
