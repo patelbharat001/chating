@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // "rooms" is just a live directory — {name, hostId, createdAt, lastActive, userCount}.
+    // No auth is used (keeps setup simple), so rules restrict the *shape* of writes instead.
+    match /rooms/{roomId} {
+
+      allow read: if true;
+
+      // Creating a room: must include exactly the expected fields, sane sizes.
+      allow create: if
+        request.resource.data.keys().hasAll(['name','hostId','createdAt','lastActive','userCount']) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 40 &&
+        request.resource.data.hostId is string &&
+        request.resource.data.userCount is number;
+
+      // Updating a room: only the heartbeat fields may change (host pings every ~15s).
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActive','userCount']);
+
+      // Deleting a room: allowed by anyone. This is what lets any visitor's browser
+      // opportunistically garbage-collect a room whose heartbeat has gone stale
+      // (host closed the tab, lost connection, etc.) without needing a paid Cloud
+      // Function / cron job to do cleanup server-side.
+      allow delete: if true;
+    }
+  }
+}

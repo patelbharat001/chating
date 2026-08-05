@@ -62,6 +62,19 @@
     width:85%; max-width:300px; display:inline-block;
   }
   .cta-button:hover{ opacity:.9; }
+  .live-counter{
+    background:rgba(91,140,255,.1); border:1px solid rgba(91,140,255,.3); border-radius:12px;
+    padding:16px 20px; margin:20px auto; max-width:300px; text-align:center;
+    font-size:13px; color:var(--dim);
+  }
+  .live-counter .number{
+    font-size:32px; font-weight:700; color:var(--accent); margin:8px 0;
+  }
+  .live-counter .pulse{
+    display:inline-block; width:8px; height:8px; background:#4ade80; border-radius:50%;
+    margin-right:6px; animation:pulse 2s infinite;
+  }
+  @keyframes pulse{ 0%, 100%{ opacity:1; } 50%{ opacity:.5; } }
   .features-section{ margin-top:40px; }
   .features-grid{
     display:grid; grid-template-columns:1fr; gap:16px;
@@ -95,6 +108,13 @@
   <div class="hero">
     <h1>Chat Without the <span class="gradient-text">Tracking</span></h1>
     <p class="subtitle">No accounts. No servers logging your messages. Just you and them.</p>
+
+    <div class="live-counter">
+      <div><span class="pulse"></span>Live now</div>
+      <div class="number" id="user-count">—</div>
+      <div style="font-size:12px; color:var(--dim);" id="room-info">Loading...</div>
+    </div>
+
     <button class="cta-button" onclick="window.location.href='./chat.html';">Enter Chat</button>
   </div>
 
@@ -128,5 +148,70 @@
 
   <div class="footer-text">chating.ai · peer-to-peer, no accounts, nothing saved</div>
 </div>
+
+<script>
+// Supabase config
+const SUPABASE_URL = "https://tsvgxlmrgqlfkyijnllj.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_mgDpmp3dnFBwB4tPl-E2eg_22zNsnXG";
+
+const { createClient } = window.supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Fetch latest stats from room_stats table
+async function updateLiveCounter() {
+  try {
+    const { data, error } = await sb
+      .from('room_stats')
+      .select('concurrent_users, active_rooms')
+      .order('recorded_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if(error) {
+      console.log('Stats not yet available');
+      return;
+    }
+
+    if(data) {
+      const userCount = data.concurrent_users || 0;
+      const roomCount = data.active_rooms || 0;
+
+      document.getElementById('user-count').textContent = userCount;
+      document.getElementById('room-info').textContent =
+        roomCount === 1
+          ? '1 room active'
+          : `${roomCount} rooms active`;
+    }
+  } catch(err) {
+    console.error('Error fetching stats:', err);
+  }
+}
+
+// Subscribe to real-time updates
+function subscribeToStats() {
+  sb.channel('room_stats_updates')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'room_stats'
+    }, payload => {
+      const newStat = payload.new;
+      document.getElementById('user-count').textContent = newStat.concurrent_users || 0;
+      document.getElementById('room-info').textContent =
+        newStat.active_rooms === 1
+          ? '1 room active'
+          : `${newStat.active_rooms} rooms active`;
+    })
+    .subscribe();
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  updateLiveCounter();
+  subscribeToStats();
+  // Fallback: update every 30 seconds
+  setInterval(updateLiveCounter, 30000);
+});
+</script>
 </body>
 </html>
