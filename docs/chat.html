@@ -363,38 +363,6 @@ async function startRoomListener(){
   }
 }
 
-// Validate if host is online by attempting quick connection
-async function isHostOnline(hostId){
-  return new Promise(resolve => {
-    const testPeer = new Peer();
-    const timeout = setTimeout(() => {
-      testPeer.destroy();
-      resolve(false);
-    }, 3000); // 3 second timeout
-
-    testPeer.on('open', () => {
-      const testConn = testPeer.connect(hostId, { reliable: true });
-      testConn.on('open', () => {
-        clearTimeout(timeout);
-        testConn.close();
-        testPeer.destroy();
-        resolve(true);
-      });
-      testConn.on('error', () => {
-        clearTimeout(timeout);
-        testPeer.destroy();
-        resolve(false);
-      });
-    });
-
-    testPeer.on('error', () => {
-      clearTimeout(timeout);
-      testPeer.destroy();
-      resolve(false);
-    });
-  });
-}
-
 function renderRoomList(){
   const listEl = document.getElementById('room-list');
   const emptyEl = document.getElementById('room-list-empty');
@@ -421,20 +389,7 @@ function renderRoomList(){
   listEl.innerHTML = '';
   emptyEl.classList.toggle('hidden', fresh.length > 0);
 
-  // Validate each room's host and only show online rooms
-  fresh.forEach(async r => {
-    const isOnline = await isHostOnline(r.host_id);
-
-    if(!isOnline) {
-      // Host is offline, remove from display and database
-      roomsMap.delete(r.id);
-      sb.from('rooms').delete().eq('id', r.id).then(
-        () => { console.debug(`Removed abandoned room: ${r.id}`); },
-        (err) => { console.error(`Failed to remove abandoned room ${r.id}:`, err); }
-      );
-      return;
-    }
-
+  fresh.forEach(r => {
     const li = document.createElement('li');
     li.className = 'room-item';
     li.innerHTML = `
