@@ -249,6 +249,7 @@ let isHost = false;
 let currentRoomId = null;
 let heartbeatTimer = null;
 let staleTickTimer = null;
+let isCreatingRoom = false; // Prevent multiple simultaneous room creations
 
 // host-only
 let connections = new Map();    // peerId -> { conn, name, video }
@@ -419,7 +420,20 @@ function createRoom(){
   const roomName = input.value.trim().slice(0, 40);
   if(!roomName){ input.focus(); return; }
 
+  // Prevent multiple simultaneous room creations
+  if(isCreatingRoom){
+    setLobbyBusy(false, 'Already creating a room. Please wait...');
+    return;
+  }
+
+  isCreatingRoom = true;
   setLobbyBusy(true, 'Opening your room…');
+
+  // Destroy any existing peer before creating new one
+  if(peer) {
+    peer.destroy();
+  }
+
   peer = new Peer(); // random id from the public PeerJS broker (free)
   peer.on('call', handleIncomingCall);
 
@@ -432,13 +446,15 @@ function createRoom(){
     }).select().single();
 
     if(error){
-      console.error(error);
+      console.error('Room creation error:', error);
+      isCreatingRoom = false;
       setLobbyBusy(false, 'Failed to create room — check your Supabase config/policies.');
       return;
     }
     currentRoomId = data.id;
     isHost = true;
     connections = new Map();
+    isCreatingRoom = false;
     enterChatScreen(roomName);
     startHeartbeat();
 
@@ -484,8 +500,17 @@ function createRoom(){
   });
 
   peer.on('error', err => {
-    console.error(err);
-    setLobbyBusy(false, 'Connection error — try again.');
+    console.error('Peer error during room creation:', err);
+    isCreatingRoom = false;
+    let errorMsg = 'Could not create room — ';
+    if(err.type === 'network') {
+      errorMsg += 'check your internet connection.';
+    } else if(err.type === 'unavailable-id') {
+      errorMsg += 'PeerJS broker is busy. Try again.';
+    } else {
+      errorMsg += 'PeerJS connection failed. Try again.';
+    }
+    setLobbyBusy(false, errorMsg);
   });
 }
 
