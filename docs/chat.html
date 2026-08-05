@@ -187,6 +187,7 @@
         </div>
       </div>
       <div class="row" style="flex:0 0 auto; gap:8px;">
+        <button class="secondary small" id="back-btn">← Back to lobby</button>
         <button class="secondary small" id="share-room-btn">Share room</button>
         <button class="secondary small" id="camera-toggle-btn">Turn on camera</button>
         <button class="danger small" id="leave-room-btn">Leave room</button>
@@ -833,7 +834,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ---------------------------- leaving ---------------------------- */
+/* ---------------------------- leaving & navigation ---------------------------- */
+document.getElementById('back-btn').addEventListener('click', returnToLobby);
 document.getElementById('leave-room-btn').addEventListener('click', returnToLobby);
 
 function returnToLobby(){
