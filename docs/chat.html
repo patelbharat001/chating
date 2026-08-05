@@ -229,7 +229,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_mgDpmp3dnFBwB4tPl-E2eg_22zNsnXG";
 const { createClient } = window.supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const STALE_MS = 45000;      // rooms with no heartbeat in 45s are considered dead
+const STALE_MS = 7200000;    // rooms with no heartbeat in 2 hours are considered dead
 const HEARTBEAT_MS = 15000;  // host pings Supabase every 15s
 
 /* ---------------------------- state ---------------------------- */
