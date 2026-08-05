@@ -317,7 +317,22 @@ async function startRoomListener(){
       'Could not reach the room directory. Check your Supabase config in index.html.';
     console.error(error);
   } else {
-    data.forEach(r => roomsMap.set(r.id, r));
+    const now = Date.now();
+
+    // Validate and filter out expired rooms before adding to map
+    data.forEach(r => {
+      const last = r.last_active ? new Date(r.last_active).getTime() : 0;
+      const isAlive = (now - last) < STALE_MS;
+
+      if(!isAlive){
+        // Delete expired room from database
+        sb.from('rooms').delete().eq('id', r.id).then(()=>{}, ()=>{});
+      } else {
+        // Only add fresh rooms to the map
+        roomsMap.set(r.id, r);
+      }
+    });
+
     renderRoomList();
   }
 
@@ -348,10 +363,14 @@ function renderRoomList(){
   const fresh = all.filter(r => {
     const last = r.last_active ? new Date(r.last_active).getTime() : 0;
     const alive = (now - last) < STALE_MS;
-    // opportunistic cleanup: any client that notices a dead room deletes it
+    // Aggressive cleanup: remove stale rooms from both UI and database
     if(!alive){
       roomsMap.delete(r.id);
-      sb.from('rooms').delete().eq('id', r.id).then(()=>{}, ()=>{});
+      // Delete expired room from database (fire and forget)
+      sb.from('rooms').delete().eq('id', r.id).then(
+        () => { console.debug(`Cleaned up expired room: ${r.id}`); },
+        (err) => { console.error(`Failed to cleanup room ${r.id}:`, err); }
+      );
     }
     return alive;
   });
