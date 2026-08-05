@@ -86,8 +86,13 @@
   /* Chat */
   .chat-layout{ display:grid; grid-template-columns:1fr 200px; gap:16px; }
   @media (max-width:640px){ .chat-layout{ grid-template-columns:1fr; } }
-  .chat-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .chat-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:12px; }
   .chat-header h2{ margin:0; font-size:18px; }
+  .share-section{ display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; font-size:12px; }
+  .share-section input{ flex:1; min-width:200px; padding:6px 8px; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px; outline:none; }
+  .share-section input:focus{ border-color:var(--accent); }
+  .share-section button{ padding:6px 10px; font-size:12px; }
+  .copy-feedback{ color:var(--accent); font-size:11px; white-space:nowrap; }
   .messages{
     background:var(--panel2); border:1px solid var(--border); border-radius:10px;
     height:420px; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px;
@@ -173,8 +178,16 @@
   <!-- SCREEN 3: chat -->
   <div id="screen-chat" class="card hidden">
     <div class="chat-header">
-      <h2 id="chat-room-title">Room</h2>
+      <div style="display:flex; align-items:center; gap:12px; flex:1;">
+        <h2 id="chat-room-title" style="margin:0;">Room</h2>
+        <div class="share-section" id="share-section" style="display:none;">
+          <input type="text" id="share-link-input" readonly />
+          <button class="small" id="copy-link-btn" title="Copy invite link">📋 Copy</button>
+          <span class="copy-feedback" id="copy-feedback"></span>
+        </div>
+      </div>
       <div class="row" style="flex:0 0 auto; gap:8px;">
+        <button class="secondary small" id="share-room-btn">Share room</button>
         <button class="secondary small" id="camera-toggle-btn">Turn on camera</button>
         <button class="danger small" id="leave-room-btn">Leave room</button>
       </div>
@@ -732,6 +745,62 @@ function sendChat(){
 document.getElementById('send-btn').addEventListener('click', sendChat);
 document.getElementById('chat-input').addEventListener('keydown', e => {
   if(e.key === 'Enter') sendChat();
+});
+
+/* ---------------------------- share room ---------------------------- */
+document.getElementById('share-room-btn').addEventListener('click', toggleShareLink);
+
+function generateShareLink(){
+  if(!currentRoomId || !myPeerId) return '';
+  const baseUrl = window.location.origin + window.location.pathname;
+  return `${baseUrl}?join=${currentRoomId}:${myPeerId}`;
+}
+
+function toggleShareLink(){
+  const shareSection = document.getElementById('share-section');
+  const shareLinkInput = document.getElementById('share-link-input');
+
+  if(shareSection.style.display === 'none'){
+    const link = generateShareLink();
+    shareLinkInput.value = link;
+    shareSection.style.display = 'flex';
+    shareLinkInput.focus();
+    shareLinkInput.select();
+  } else {
+    shareSection.style.display = 'none';
+  }
+}
+
+document.getElementById('copy-link-btn').addEventListener('click', async () => {
+  const link = document.getElementById('share-link-input').value;
+  try {
+    await navigator.clipboard.writeText(link);
+    const feedback = document.getElementById('copy-feedback');
+    feedback.textContent = 'Copied!';
+    setTimeout(() => { feedback.textContent = ''; }, 2000);
+  } catch(err){
+    console.error('Failed to copy:', err);
+    alert('Could not copy to clipboard');
+  }
+});
+
+// Handle join from share link on page load
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const joinParam = params.get('join');
+  if(joinParam){
+    const [roomId, hostId] = joinParam.split(':');
+    if(roomId && hostId){
+      // Auto-join this room after name is loaded
+      setTimeout(() => {
+        if(screens.lobby.classList.contains('hidden')){
+          // Already in chat or somewhere else
+          return;
+        }
+        joinRoom(roomId, hostId, 'Shared Room');
+      }, 500);
+    }
+  }
 });
 
 /* ---------------------------- leaving ---------------------------- */
