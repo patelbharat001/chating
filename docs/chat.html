@@ -466,18 +466,6 @@ async function createRoom(){
     return;
   }
 
-  // Check if user already has max rooms
-  const { data: userRooms, error: countError } = await sb
-    .from('rooms')
-    .select('id')
-    .eq('host_id', myPeerId || 'checking');
-
-  if(!countError && userRooms && userRooms.length >= CONFIG.room.maxRoomsPerHost){
-    const maxRooms = CONFIG.room.maxRoomsPerHost;
-    setLobbyBusy(false, `You can only host up to ${maxRooms} rooms at once. Leave another room to create a new one.`);
-    return;
-  }
-
   isCreatingRoom = true;
   setLobbyBusy(true, 'Opening your room…');
 
@@ -491,6 +479,20 @@ async function createRoom(){
 
   peer.on('open', async (id) => {
     myPeerId = id;
+
+    // Check if user already has max rooms
+    const { data: userRooms, error: countError } = await sb
+      .from('rooms')
+      .select('id')
+      .eq('host_id', id);
+
+    if(!countError && userRooms && userRooms.length >= CONFIG.room.maxRoomsPerHost){
+      isCreatingRoom = false;
+      const maxRooms = CONFIG.room.maxRoomsPerHost;
+      setLobbyBusy(false, `You can only host up to ${maxRooms} rooms at once. Close another room to create a new one.`);
+      return;
+    }
+
     const { data, error } = await sb.from('rooms').insert({
       name: roomName,
       host_id: id,
@@ -617,8 +619,22 @@ function startHeartbeat(){
 /* ---------------------------- join room (client) ---------------------------- */
 function joinRoom(roomId, hostId, roomName){
   setLobbyBusy(true, 'Joining room…');
+
+  // Destroy any existing peer before creating new one
+  if(peer) {
+    peer.destroy();
+  }
+
   peer = new Peer();
   peer.on('call', handleIncomingCall);
+
+  // Timeout if connection takes too long
+  const connectionTimeout = setTimeout(() => {
+    if(hostConn && !hostConn.open){
+      setLobbyBusy(false, 'Connection timeout. The room may be unavailable.');
+      peer.destroy();
+    }
+  }, 10000);
 
   peer.on('open', (id) => {
     myPeerId = id;
@@ -626,6 +642,7 @@ function joinRoom(roomId, hostId, roomName){
     hostConn = conn;
 
     conn.on('open', () => {
+      clearTimeout(connectionTimeout);
       isHost = false;
       currentRoomId = roomId;
       enterChatScreen(roomName);
@@ -647,6 +664,11 @@ function joinRoom(roomId, hostId, roomName){
     conn.on('close', () => {
       appendMessage({ system: true, text: 'The host ended the room.' });
       setTimeout(returnToLobby, 1200);
+    });
+    conn.on('error', (err) => {
+      console.error('Connection error:', err);
+      setLobbyBusy(false, 'Could not connect to room host. Room may have closed.');
+      setTimeout(returnToLobby, 2000);
     });
   });
 
