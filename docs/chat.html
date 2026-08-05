@@ -113,6 +113,7 @@
   .participants li{ padding:6px 0; font-size:14px; border-bottom:1px solid var(--border); }
   .participants li:last-child{ border-bottom:none; }
   .participants li .tag{ color:var(--accent); font-size:12px; }
+  .room-expiration{ font-size:11px; color:var(--dim); margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
 
   /* Video */
   .video-bar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; }
@@ -214,6 +215,7 @@
       <div class="participants">
         <h3>In this room</h3>
         <ul id="participant-list"></ul>
+        <div class="room-expiration" id="room-expiration"></div>
       </div>
     </div>
   </div>
@@ -572,12 +574,54 @@ function joinRoom(roomId, hostId, roomName){
   });
 
   peer.on('error', err => {
-    console.error(err);
-    setLobbyBusy(false, 'Could not reach that room — it may have just closed.');
+    console.error('Peer error:', err);
+    let errorMsg = 'Could not connect to the room. ';
+    if(err.type === 'peer-unavailable') {
+      errorMsg += 'The host may have left or the room expired.';
+    } else if(err.type === 'network') {
+      errorMsg += 'Check your internet connection.';
+    } else {
+      errorMsg += 'Try again in a moment.';
+    }
+    setLobbyBusy(false, errorMsg);
   });
 }
 
-/* ---------------------------- chat screen ---------------------------- */
+/* ---------------------------- chat screen & room expiration ---------------------------- */
+function updateRoomExpiration(){
+  if(!isHost || !currentRoomId) {
+    document.getElementById('room-expiration').innerHTML = '';
+    return;
+  }
+
+  // Room expires 2 hours after last activity
+  const TWO_HOURS = 2 * 60 * 60 * 1000;
+  const now = Date.now();
+  const lastPing = now; // We just pinged
+
+  setInterval(() => {
+    const elapsed = Date.now() - lastPing;
+    const remaining = TWO_HOURS - elapsed;
+
+    if(remaining <= 0) {
+      document.getElementById('room-expiration').innerHTML = 'Room expires now';
+      return;
+    }
+
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+
+    let text = 'Expires in ';
+    if(hours > 0) {
+      text += `${hours}h ${minutes}m`;
+    } else {
+      text += `${minutes}m`;
+    }
+
+    document.getElementById('room-expiration').innerHTML = `⏰ ${text}`;
+  }, 30000); // Update every 30 seconds
+}
+
 function enterChatScreen(roomName){
   setLobbyBusy(false, '');
   localStorage.setItem(STORAGE_ROOM_KEY, roomName);
@@ -588,6 +632,11 @@ function enterChatScreen(roomName){
   showScreen('chat');
   document.getElementById('chat-input').focus();
   appendMessage({ system: true, text: `You joined "${roomName}"` });
+
+  // Show expiration counter for host
+  if(isHost) {
+    updateRoomExpiration();
+  }
 }
 
 function appendMessage({ from, text, system }){
