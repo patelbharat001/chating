@@ -229,6 +229,10 @@ let hostVideoOn = false;
 // client-only
 let hostConn = null;
 
+/* -------------------- local storage keys -------------------- */
+const STORAGE_NAME_KEY = 'chating_user_name';
+const STORAGE_ROOM_KEY = 'chating_last_room_name';
+
 /* ---------------------------- video state ---------------------------- */
 let myPeerId = null;
 let localStream = null;
@@ -257,6 +261,7 @@ function submitName(){
   const val = nameInput.value.trim();
   if(!val){ nameInput.focus(); return; }
   myName = val.slice(0, 24);
+  localStorage.setItem(STORAGE_NAME_KEY, myName);
   document.getElementById('lobby-name').textContent = myName;
   showScreen('lobby');
   startRoomListener();
@@ -265,6 +270,21 @@ document.getElementById('change-name').addEventListener('click', () => {
   showScreen('name');
   nameInput.value = myName;
   nameInput.focus();
+});
+
+// Load saved name from local storage on page load
+window.addEventListener('DOMContentLoaded', () => {
+  const savedName = localStorage.getItem(STORAGE_NAME_KEY);
+  if(savedName){
+    myName = savedName;
+    nameInput.value = myName;
+    document.getElementById('lobby-name').textContent = myName;
+    // Auto-continue to lobby if name is saved
+    setTimeout(() => {
+      showScreen('lobby');
+      startRoomListener();
+    }, 100);
+  }
 });
 
 /* ---------------------------- lobby: live room list ---------------------------- */
@@ -389,6 +409,15 @@ function createRoom(){
   peer.on('connection', conn => {
     conn.on('open', () => {
       const joinerName = (conn.metadata && conn.metadata.name) ? conn.metadata.name : 'Guest';
+
+      // Prevent duplicate users (same name) from joining
+      const isDuplicate = [...connections.values()].some(c => c.name === joinerName);
+      if(isDuplicate){
+        appendMessage({ system: true, text: `${joinerName} tried to join but is already in the room` });
+        conn.close();
+        return;
+      }
+
       connections.set(conn.peer, { conn, name: joinerName, video: false });
       broadcastSystem(`${joinerName} joined the room`);
       broadcastRoster();
@@ -507,6 +536,7 @@ function joinRoom(roomId, hostId, roomName){
 /* ---------------------------- chat screen ---------------------------- */
 function enterChatScreen(roomName){
   setLobbyBusy(false, '');
+  localStorage.setItem(STORAGE_ROOM_KEY, roomName);
   document.getElementById('chat-room-title').textContent = roomName;
   document.getElementById('messages').innerHTML = '';
   renderParticipants([{ peerId: myPeerId, name: myName, video: false }]);
