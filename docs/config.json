@@ -1,0 +1,24 @@
+{
+  "supabase": {
+    "url": "https://tsvgxlmrgqlfkyijnllj.supabase.co",
+    "anonKey": "sb_publishable_mgDpmp3dnFBwB4tPl-E2eg_22zNsnXG"
+  },
+  "room": {
+    "maxNameLength": 40,
+    "staleMsHours": 2,
+    "staleMs": 7200000,
+    "maxRoomsPerHost": 5,
+    "heartbeatIntervalMs": 15000,
+    "expirationUpdateIntervalMs": 30000
+  },
+  "storage": {
+    "usernameKey": "username",
+    "currentRoomKey": "currentRoom"
+  },
+  "peerjs": {
+    "host": "0.peerjs.com",
+    "port": 443,
+    "secure": true,
+    "path": "/peerjs/id"
+  }
+}

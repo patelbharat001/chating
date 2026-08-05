@@ -153,12 +153,23 @@
 </div>
 
 <script>
-// Supabase config
-const SUPABASE_URL = "https://tsvgxlmrgqlfkyijnllj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_mgDpmp3dnFBwB4tPl-E2eg_22zNsnXG";
+// Load config from config.json
+let CONFIG = null;
+let sb = null;
 
-const { createClient } = window.supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+async function loadConfig() {
+  try {
+    const response = await fetch('./config.json');
+    CONFIG = await response.json();
+    const { createClient } = window.supabase;
+    sb = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+    console.log('Config loaded successfully');
+    return true;
+  } catch (err) {
+    console.error('Failed to load config.json:', err);
+    return false;
+  }
+}
 
 // Fetch latest stats from room_stats table
 async function updateLiveCounter() {
@@ -226,7 +237,12 @@ function subscribeToStats() {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  const configLoaded = await loadConfig();
+  if(!configLoaded || !sb) {
+    console.error('Failed to initialize: config not loaded');
+    return;
+  }
   updateLiveCounter();
   subscribeToStats();
   // Fallback: update every 30 seconds

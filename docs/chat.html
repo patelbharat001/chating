@@ -182,6 +182,10 @@
       <strong style="color:var(--text);">💡 Room Cleanup Policy</strong><br/>
       Inactive rooms (no activity for 2 hours) are automatically removed from the directory. Keep your room active by staying connected to prevent automatic cleanup.
     </div>
+    <div style="background:rgba(124,91,255,.08); border:1px solid rgba(124,91,255,.2); border-radius:10px; padding:12px; margin-top:12px; font-size:12px; color:var(--dim); line-height:1.5;">
+      <strong style="color:var(--text);">📊 Host Limit</strong><br/>
+      You can host up to 5 rooms at once. Leave a room to create more.
+    </div>
   </div>
 
   <!-- SCREEN 3: chat -->
@@ -228,19 +232,29 @@
 
 <script>
 /* =========================================================================
-   1) SUPABASE CONFIG
-   Already pointed at your project (Swarneevtech). If you ever move this to
-   a different Supabase project, replace these two values — both are safe
-   to expose publicly, they're the anon/publishable key, not a secret.
+   1) LOAD CONFIGURATION FROM config.json
+   All settings are centralized in config.json for easy modification
    ========================================================================= */
-const SUPABASE_URL = "https://tsvgxlmrgqlfkyijnllj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_mgDpmp3dnFBwB4tPl-E2eg_22zNsnXG";
+let CONFIG = null;
+let sb = null;
 
-const { createClient } = window.supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+async function loadConfig() {
+  try {
+    const response = await fetch('./config.json');
+    CONFIG = await response.json();
+    const { createClient } = window.supabase;
+    sb = createClient(CONFIG.supabase.url, CONFIG.supabase.anonKey);
+    window.sb = sb;
+    console.log('Config loaded successfully');
+  } catch (err) {
+    console.error('Failed to load config.json:', err);
+    alert('Failed to load configuration. Please refresh the page.');
+  }
+}
 
-const STALE_MS = 7200000;    // rooms with no heartbeat in 2 hours are considered dead
-const HEARTBEAT_MS = 15000;  // host pings Supabase every 15s
+// Aliases for backward compatibility
+let STALE_MS = 7200000;
+let HEARTBEAT_MS = 15000;
 
 /* ---------------------------- state ---------------------------- */
 let myName = "";
@@ -289,7 +303,7 @@ function submitName(){
   const val = nameInput.value.trim();
   if(!val){ nameInput.focus(); return; }
   myName = val.slice(0, 24);
-  localStorage.setItem(STORAGE_NAME_KEY, myName);
+  localStorage.setItem(CONFIG.storage.usernameKey, myName);
   document.getElementById('lobby-name').textContent = myName;
   showScreen('lobby');
   startRoomListener();
@@ -300,9 +314,16 @@ document.getElementById('change-name').addEventListener('click', () => {
   nameInput.focus();
 });
 
-// Load saved name from local storage on page load
-window.addEventListener('DOMContentLoaded', () => {
-  const savedName = localStorage.getItem(STORAGE_NAME_KEY);
+// Load config, then initialize app
+async function initializeApp(){
+  await loadConfig();
+  if(!CONFIG || !sb) return;
+
+  // Update aliases with config values
+  STALE_MS = CONFIG.room.staleMs;
+  HEARTBEAT_MS = CONFIG.room.heartbeatIntervalMs;
+
+  const savedName = localStorage.getItem(CONFIG.storage.usernameKey);
   if(savedName){
     myName = savedName;
     nameInput.value = myName;
@@ -313,7 +334,24 @@ window.addEventListener('DOMContentLoaded', () => {
       startRoomListener();
     }, 100);
   }
-});
+
+  // Handle join from share link on page load
+  const params = new URLSearchParams(window.location.search);
+  const joinParam = params.get('join');
+  if(joinParam && myName){
+    const [roomId, hostId] = joinParam.split(':');
+    if(roomId && hostId){
+      setTimeout(() => {
+        if(!screens.lobby.classList.contains('hidden')){
+          joinRoom(roomId, hostId, 'Shared Room');
+        }
+      }, 500);
+    }
+  }
+}
+
+// Call initialization when page is ready
+window.addEventListener('DOMContentLoaded', initializeApp);
 
 /* ---------------------------- lobby: live room list ---------------------------- */
 let roomsChannel = null;
@@ -415,14 +453,28 @@ document.getElementById('room-name-input').addEventListener('keydown', e => {
   if(e.key === 'Enter') createRoom();
 });
 
-function createRoom(){
+async function createRoom(){
+  if(!CONFIG || !sb){ return; }
+
   const input = document.getElementById('room-name-input');
-  const roomName = input.value.trim().slice(0, 40);
+  const roomName = input.value.trim().slice(0, CONFIG.room.maxNameLength);
   if(!roomName){ input.focus(); return; }
 
   // Prevent multiple simultaneous room creations
   if(isCreatingRoom){
     setLobbyBusy(false, 'Already creating a room. Please wait...');
+    return;
+  }
+
+  // Check if user already has max rooms
+  const { data: userRooms, error: countError } = await sb
+    .from('rooms')
+    .select('id')
+    .eq('host_id', myPeerId || 'checking');
+
+  if(!countError && userRooms && userRooms.length >= CONFIG.room.maxRoomsPerHost){
+    const maxRooms = CONFIG.room.maxRoomsPerHost;
+    setLobbyBusy(false, `You can only host up to ${maxRooms} rooms at once. Leave another room to create a new one.`);
     return;
   }
 
@@ -649,7 +701,7 @@ function updateRoomExpiration(){
 
 function enterChatScreen(roomName){
   setLobbyBusy(false, '');
-  localStorage.setItem(STORAGE_ROOM_KEY, roomName);
+  localStorage.setItem(CONFIG.storage.currentRoomKey, roomName);
   document.getElementById('chat-room-title').textContent = roomName;
   document.getElementById('messages').innerHTML = '';
   renderParticipants([{ peerId: myPeerId, name: myName, video: false }]);
@@ -919,24 +971,6 @@ document.getElementById('copy-link-btn').addEventListener('click', async () => {
   }
 });
 
-// Handle join from share link on page load
-window.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(window.location.search);
-  const joinParam = params.get('join');
-  if(joinParam){
-    const [roomId, hostId] = joinParam.split(':');
-    if(roomId && hostId){
-      // Auto-join this room after name is loaded
-      setTimeout(() => {
-        if(screens.lobby.classList.contains('hidden')){
-          // Already in chat or somewhere else
-          return;
-        }
-        joinRoom(roomId, hostId, 'Shared Room');
-      }, 500);
-    }
-  }
-});
 
 /* ---------------------------- leaving & navigation ---------------------------- */
 document.getElementById('back-btn').addEventListener('click', returnToLobby);
