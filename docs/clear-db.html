@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Clear Database - chating.ai</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+    background: #0f1117;
+    color: #e8eaf0;
+  }
+  .card {
+    background: #171a23;
+    border: 1px solid #2a2f3f;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+  }
+  button {
+    background: #5b8cff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  button:hover {
+    opacity: 0.8;
+  }
+  .warning {
+    color: #ff5b6f;
+    font-weight: bold;
+  }
+  .success {
+    color: #4ade80;
+  }
+  .info {
+    color: #8b90a3;
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🗑️ Clear Database</h1>
+  <p class="warning">⚠️ WARNING: This will delete ALL rooms from the database!</p>
+
+  <div class="info">
+    <p>This tool will:</p>
+    <ul>
+      <li>Delete all entries from the 'rooms' table</li>
+      <li>Keep the database structure intact</li>
+    </ul>
+  </div>
+
+  <button onclick="clearDatabase()">Delete All Rooms</button>
+  <div id="status" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+async function clearDatabase() {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Deleting...';
+  statusEl.className = 'info';
+
+  try {
+    const config = await fetch('./config.json').then(r => r.json());
+    const { createClient } = window.supabase;
+    const sb = createClient(config.supabase.url, config.supabase.anonKey);
+
+    // Get all room IDs
+    const { data: allRooms, error: selectError } = await sb
+      .from('rooms')
+      .select('id');
+
+    if (selectError) throw selectError;
+
+    console.log(`Found ${allRooms?.length || 0} rooms to delete`);
+
+    // Delete all rooms
+    if (allRooms && allRooms.length > 0) {
+      const roomIds = allRooms.map(r => r.id);
+      const { error: deleteError } = await sb
+        .from('rooms')
+        .delete()
+        .in('id', roomIds);
+
+      if (deleteError) throw deleteError;
+    }
+
+    // Verify deletion
+    const { data: remaining, error: verifyError } = await sb
+      .from('rooms')
+      .select('*');
+
+    if (verifyError) throw verifyError;
+
+    statusEl.className = 'success';
+    statusEl.innerHTML = `
+      <strong>✓ Database cleared successfully!</strong><br/>
+      Deleted rooms: ${allRooms?.length || 0}<br/>
+      Remaining rooms: ${remaining ? remaining.length : 0}<br/>
+      <br/>
+      <a href="./chat.html" style="color: #5b8cff; text-decoration: none;">← Back to Chat</a>
+    `;
+  } catch (err) {
+    statusEl.className = 'warning';
+    statusEl.textContent = 'Error: ' + (err.message || 'Unknown error');
+    console.error('Clear DB error:', err);
+  }
+}
+</script>
+</body>
+</html>
