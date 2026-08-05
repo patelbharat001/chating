@@ -488,6 +488,7 @@ async function createRoom(){
 
     if(!countError && userRooms && userRooms.length >= CONFIG.room.maxRoomsPerHost){
       isCreatingRoom = false;
+      peer.destroy();
       const maxRooms = CONFIG.room.maxRoomsPerHost;
       setLobbyBusy(false, `You can only host up to ${maxRooms} rooms at once. Close another room to create a new one.`);
       return;
@@ -502,6 +503,7 @@ async function createRoom(){
     if(error){
       console.error('Room creation error:', error);
       isCreatingRoom = false;
+      peer.destroy();
       setLobbyBusy(false, 'Failed to create room — check your Supabase config/policies.');
       return;
     }
@@ -556,6 +558,9 @@ async function createRoom(){
   peer.on('error', err => {
     console.error('Peer error during room creation:', err);
     isCreatingRoom = false;
+    if(peer) {
+      peer.destroy();
+    }
     let errorMsg = 'Could not create room — ';
     if(err.type === 'network') {
       errorMsg += 'check your internet connection.';
