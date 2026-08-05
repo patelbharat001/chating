@@ -164,45 +164,62 @@ async function updateLiveCounter() {
       .from('room_stats')
       .select('concurrent_users, active_rooms')
       .order('recorded_at', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
     if(error) {
-      console.log('Stats not yet available');
+      console.error('Error fetching stats:', error);
+      document.getElementById('user-count').textContent = '0';
+      document.getElementById('room-info').textContent = 'No rooms active';
       return;
     }
 
-    if(data) {
-      const userCount = data.concurrent_users || 0;
-      const roomCount = data.active_rooms || 0;
+    if(data && data.length > 0) {
+      const stat = data[0];
+      const userCount = stat.concurrent_users || 0;
+      const roomCount = stat.active_rooms || 0;
 
       document.getElementById('user-count').textContent = userCount;
       document.getElementById('room-info').textContent =
         roomCount === 1
           ? '1 room active'
           : `${roomCount} rooms active`;
+    } else {
+      // No data yet
+      document.getElementById('user-count').textContent = '0';
+      document.getElementById('room-info').textContent = 'No rooms active';
     }
   } catch(err) {
     console.error('Error fetching stats:', err);
+    document.getElementById('user-count').textContent = '0';
+    document.getElementById('room-info').textContent = 'No rooms active';
   }
 }
 
 // Subscribe to real-time updates
 function subscribeToStats() {
-  sb.channel('room_stats_updates')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'room_stats'
-    }, payload => {
-      const newStat = payload.new;
-      document.getElementById('user-count').textContent = newStat.concurrent_users || 0;
-      document.getElementById('room-info').textContent =
-        newStat.active_rooms === 1
-          ? '1 room active'
-          : `${newStat.active_rooms} rooms active`;
-    })
-    .subscribe();
+  try {
+    sb.channel('room_stats_updates')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'room_stats'
+      }, payload => {
+        const newStat = payload.new;
+        const userCount = newStat.concurrent_users || 0;
+        const roomCount = newStat.active_rooms || 0;
+
+        document.getElementById('user-count').textContent = userCount;
+        document.getElementById('room-info').textContent =
+          roomCount === 1
+            ? '1 room active'
+            : `${roomCount} rooms active`;
+      })
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+      });
+  } catch(err) {
+    console.error('Error subscribing to stats:', err);
+  }
 }
 
 // Initialize on page load
