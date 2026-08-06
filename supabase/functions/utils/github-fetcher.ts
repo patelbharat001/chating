@@ -1,5 +1,3 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 interface GitHubRepo {
   name: string;
   html_url: string;
@@ -7,7 +5,7 @@ interface GitHubRepo {
   description: string;
 }
 
-interface Prompt {
+export interface Prompt {
   title: string;
   description: string;
   content: string;
@@ -35,9 +33,11 @@ export async function fetchGitHubPrompts(
       const data = await response.json();
 
       // Fetch top repositories
-      for (const repo of data.items.slice(0, maxResults)) {
-        const repoPrompts = await fetchPromptFilesFromRepo(repo, keyword);
-        prompts.push(...repoPrompts);
+      if (data.items) {
+        for (const repo of data.items.slice(0, maxResults)) {
+          const repoPrompts = await fetchPromptFilesFromRepo(repo, keyword);
+          prompts.push(...repoPrompts);
+        }
       }
     }
 
