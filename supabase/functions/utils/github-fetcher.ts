@@ -35,6 +35,7 @@ export async function fetchGitHubPrompts(
       if (!response.ok) throw new Error(`GitHub API error: ${response.statusText}`);
 
       const data = await response.json();
+      console.log(`GitHub response: ${data.total_count} results for "${keyword}"`);
 
       // Fetch top repositories
       if (data.items) {
