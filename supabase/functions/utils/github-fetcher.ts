@@ -29,6 +29,8 @@ export async function fetchGitHubPrompts(
       const query = `${keyword} language:markdown stars:>=${minStars}`;
       const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=50`;
 
+      console.log(`GitHub search: "${keyword}" minStars=${minStars}`);
+
       const response = await fetch(url, { headers });
       if (!response.ok) throw new Error(`GitHub API error: ${response.statusText}`);
 
