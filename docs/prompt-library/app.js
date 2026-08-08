@@ -1,7 +1,19 @@
-// Configuration
-const SUPABASE_URL = 'https://tsvgxlmrgqlfkyijnllj.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzdmd4bG1yZ3FsZmt5aWpubGxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTYzNzUwMjcsImV4cCI6MjAxMjE4MjYyN30.9pPvuRKAj8x9K7EjVc-KX7fPCdV5nVxnHwpQ4K2JzOQ';
-const API_BASE = `${SUPABASE_URL}/rest/v1`;
+// Load configuration
+let SUPABASE_URL = '';
+let SUPABASE_KEY = '';
+let API_BASE = '';
+
+const loadConfig = async () => {
+  try {
+    const res = await fetch('../config.json');
+    const config = await res.json();
+    SUPABASE_URL = config.supabase.url;
+    SUPABASE_KEY = config.supabase.anonKey;
+    API_BASE = `${SUPABASE_URL}/rest/v1`;
+  } catch (err) {
+    console.error('Failed to load config:', err);
+  }
+};
 
 // State
 let allCategories = [];
@@ -51,6 +63,7 @@ resultsList.addEventListener('click', (e) => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadConfig();
   await loadCategories();
   displayDefaultResults();
 });
