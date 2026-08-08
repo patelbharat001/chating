@@ -19,12 +19,35 @@ const resultsList = document.getElementById('resultsList');
 const resultsInfo = document.getElementById('resultsInfo');
 const loadMoreBtn = document.getElementById('loadMoreBtn');
 
+// State for debouncing (Fix #7)
+let searchTimeout;
+
 // Event Listeners
-searchBtn.addEventListener('click', performSearch);
+searchBtn.addEventListener('click', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => performSearch(), 300);
+});
 searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') performSearch();
+  if (e.key === 'Enter') {
+    clearTimeout(searchTimeout);
+    performSearch();
+  }
 });
 loadMoreBtn.addEventListener('click', loadMore);
+
+// Event delegation for dynamic content (Fix #6)
+categoriesList.addEventListener('click', (e) => {
+  if (e.target.classList.contains('category-link')) {
+    e.preventDefault();
+    selectCategory(e);
+  }
+});
+
+resultsList.addEventListener('click', (e) => {
+  if (e.target.classList.contains('copy-btn')) {
+    copyPrompt(e);
+  }
+});
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -66,7 +89,6 @@ function renderCategories() {
         href="#"
         data-category-id="${cat.id}"
         class="category-link"
-        onclick="selectCategory(event, '${cat.id}')"
       >
         ${cat.icon} ${cat.name}
         <span style="color: var(--dim); font-size: 12px;">(${cat.prompt_count})</span>
@@ -75,21 +97,22 @@ function renderCategories() {
   `).join('');
 
   categoriesList.innerHTML = `
-    <li><a href="#" data-category-id="all" class="category-link active" onclick="selectCategory(event, 'all')">All Categories</a></li>
+    <li><a href="#" data-category-id="all" class="category-link active">All Categories</a></li>
     ${html}
   `;
 }
 
-// Select category
-function selectCategory(event, categoryId) {
+// Select category (Fix #2: use data attribute instead of parameter)
+function selectCategory(event) {
   event.preventDefault();
-  selectedCategoryId = categoryId;
+  const categoryLink = event.target.closest('a');
+  selectedCategoryId = categoryLink.dataset.categoryId;
 
   // Update active class
   document.querySelectorAll('.category-link').forEach(link => {
     link.classList.remove('active');
   });
-  event.target.closest('a').classList.add('active');
+  categoryLink.classList.add('active');
 
   // Reset search and perform new search
   currentPage = 0;
@@ -143,6 +166,24 @@ async function performSearch() {
   }
 }
 
+// Validate prompt has required fields (Fix #5)
+function validatePrompt(prompt) {
+  return !!(
+    prompt.id && prompt.title && prompt.content &&
+    prompt.source && prompt.source_url && prompt.author && prompt.created_at
+  );
+}
+
+// Validate and get safe URL (Fix #3)
+function getSafeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol) ? url : '#';
+  } catch {
+    return '#';
+  }
+}
+
 // Display results
 function displayResults() {
   const start = currentPage * RESULTS_PER_PAGE;
@@ -157,26 +198,38 @@ function displayResults() {
 
   resultsInfo.textContent = `Showing ${start + 1}–${Math.min(end, currentResults.length)} of ${currentResults.length} prompts`;
 
-  const html = pageResults.map(prompt => `
-    <div class="prompt-card">
-      <h3 class="prompt-title">${escapeHtml(prompt.title)}</h3>
-      <p class="prompt-description">${escapeHtml(prompt.description || '')}</p>
-      <div class="prompt-meta">
-        <span class="prompt-source">${prompt.source.toUpperCase()}</span>
-        <span>${prompt.author || 'Unknown'}</span>
-        <span>${new Date(prompt.created_at).toLocaleDateString()}</span>
+  const html = pageResults.map(prompt => {
+    // Validate prompt before rendering (Fix #5)
+    if (!validatePrompt(prompt)) {
+      console.warn('Skipping invalid prompt:', prompt);
+      return '';
+    }
+
+    const safeUrl = getSafeUrl(prompt.source_url);
+    const contentPreview = escapeHtml(prompt.content.substring(0, 300));
+    const fullContent = prompt.content;
+
+    return `
+      <div class="prompt-card">
+        <h3 class="prompt-title">${escapeHtml(prompt.title)}</h3>
+        <p class="prompt-description">${escapeHtml(prompt.description || '')}</p>
+        <div class="prompt-meta">
+          <span class="prompt-source">${escapeHtml(prompt.source).toUpperCase()}</span>
+          <span>${escapeHtml(prompt.author || 'Unknown')}</span>
+          <span>${new Date(prompt.created_at).toLocaleDateString()}</span>
+        </div>
+        <div class="prompt-content">${contentPreview}${prompt.content.length > 300 ? '...' : ''}</div>
+        <div class="prompt-actions">
+          <button class="copy-btn" data-content="${escapeHtml(fullContent)}">
+            📋 Copy Prompt
+          </button>
+          <a href="${safeUrl}" target="_blank" style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; color: var(--dim); text-decoration: none; font-size: 12px;">
+            Source ↗
+          </a>
+        </div>
       </div>
-      <div class="prompt-content">${escapeHtml(prompt.content.substring(0, 300))}${prompt.content.length > 300 ? '...' : ''}</div>
-      <div class="prompt-actions">
-        <button class="copy-btn" onclick="copyPrompt(event, '${escapeHtml(prompt.content)}')">
-          📋 Copy Prompt
-        </button>
-        <a href="${escapeHtml(prompt.source_url)}" target="_blank" style="padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; color: var(--dim); text-decoration: none; font-size: 12px;">
-          Source ↗
-        </a>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).filter(Boolean).join('');
 
   resultsList.innerHTML = html;
 
@@ -195,12 +248,14 @@ function loadMore() {
   window.scrollTo({ top: resultsList.offsetTop, behavior: 'smooth' });
 }
 
-// Copy to clipboard
-async function copyPrompt(event, text) {
+// Copy to clipboard (Fix #1: use data attribute instead of escaped parameter)
+async function copyPrompt(event) {
   event.preventDefault();
+  const btn = event.target;
+  const text = btn.dataset.content;
+
   try {
     await navigator.clipboard.writeText(text);
-    const btn = event.target;
     btn.textContent = '✓ Copied!';
     btn.classList.add('copied');
     setTimeout(() => {
@@ -230,8 +285,14 @@ async function displayDefaultResults() {
     if (response.ok) {
       currentResults = await response.json();
       displayResults();
+    } else {
+      // Fix #4: Add error message instead of silent failure
+      resultsInfo.textContent = 'Failed to load prompts. Please refresh the page.';
+      console.error('Failed to load default results:', response.status);
     }
   } catch (error) {
+    // Fix #4: Add error message for network/parsing errors
+    resultsInfo.textContent = 'Error loading prompts. Please refresh the page.';
     console.error('Error loading default results:', error);
   } finally {
     showSpinner(false);
