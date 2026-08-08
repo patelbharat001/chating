@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { fetchGitHubPrompts } from '../utils/github-fetcher.ts';
 import { fetchOpenAIPrompts } from '../utils/openai-fetcher.ts';
-import { hashContent, cleanPromptText, validatePrompt } from '../utils/prompt-parser.ts';
+import { cleanPromptText, validatePrompt } from '../utils/prompt-parser.ts';
 import type { Prompt } from '../utils/github-fetcher.ts';
 
 const supabase = createClient(
@@ -92,7 +92,6 @@ async function upsertPrompt(prompt: Prompt, categoryId: string) {
   }
 
   const cleanedContent = cleanPromptText(prompt.content);
-  const contentHash = hashContent(cleanedContent);
 
   const { error } = await supabase
     .from('prompts')
@@ -105,9 +104,8 @@ async function upsertPrompt(prompt: Prompt, categoryId: string) {
         source_url: prompt.source_url,
         category_id: categoryId,
         author: (prompt.author || 'Unknown').slice(0, 100),
-        created_at: new Date().toISOString()
-      },
-      { onConflict: 'source_url,category_id' }
+        updated_at: new Date().toISOString()
+      }
     );
 
   if (error) {
@@ -122,7 +120,9 @@ Deno.serve(async (req) => {
   }
 
   const result = await aggregatePrompts();
+  const statusCode = result.status === 'error' ? 500 : 200;
   return new Response(JSON.stringify(result), {
+    status: statusCode,
     headers: { 'Content-Type': 'application/json' }
   });
 });

@@ -19,7 +19,16 @@ export async function fetchOpenAIPrompts(path: string = 'examples'): Promise<Pro
     for (const file of files) {
       if (file.name.endsWith('.md') && file.type === 'file') {
         const rawUrl = `${baseUrl}/${path}/${file.name}`;
-        const content = await fetch(rawUrl).then(r => r.text());
+
+        let content: string;
+        try {
+          const response = await fetch(rawUrl);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          content = await response.text();
+        } catch (error) {
+          console.warn(`Failed to fetch ${file.name}:`, error);
+          continue;  // Skip this file, continue with others
+        }
 
         // Extract prompt sections from markdown
         const sections = extractPromptSections(content, file.name);
@@ -43,21 +52,33 @@ export async function fetchOpenAIPrompts(path: string = 'examples'): Promise<Pro
   }
 }
 
-function extractPromptSections(markdown: string, filename: string): any[] {
-  const sections = [];
+interface PromptSection {
+  title: string;
+  description: string;
+  content: string;
+}
+
+function extractPromptSections(markdown: string, filename: string): PromptSection[] {
+  const sections: PromptSection[] = [];
 
   // Extract code blocks
   const codeBlockRegex = /```(?:python|typescript|javascript|plaintext)?\n([\s\S]*?)```/g;
   const headingRegex = /^#+\s+(.+)$/gm;
 
   let codeMatch;
-  let headingMatches = [...markdown.matchAll(headingRegex)];
 
   while ((codeMatch = codeBlockRegex.exec(markdown)) !== null) {
-    const heading = headingMatches.length > 0 ? headingMatches[0][1] : filename;
+    // Find all headings that appear before this code block
+    const headingsBeforeBlock = [...markdown.matchAll(headingRegex)]
+      .filter(h => h.index! < codeMatch.index);
+
+    // Use the most recent heading (closest to this block)
+    const closestHeading = headingsBeforeBlock.length > 0
+      ? headingsBeforeBlock[headingsBeforeBlock.length - 1][1]
+      : filename;
 
     sections.push({
-      title: heading,
+      title: closestHeading,
       description: `Example from ${filename}`,
       content: codeMatch[1].trim()
     });
