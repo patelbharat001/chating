@@ -20,11 +20,8 @@ export async function fetchGitHubPrompts(
   maxResults: number
 ): Promise<Prompt[]> {
   const prompts: Prompt[] = [];
-  const githubToken = Deno.env.get('GITHUB_TOKEN');
-  console.log('GitHub Token available:', !!githubToken);
   const headers = {
-    'Accept': 'application/vnd.github.v3+json',
-    ...(githubToken && { 'Authorization': `token ${githubToken}` })
+    'Accept': 'application/vnd.github.v3+json'
   };
 
   try {
